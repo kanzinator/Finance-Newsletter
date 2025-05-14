@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 import openai
 import yfinance as yf
+import streamlit as st   # ← NEW
 
 from utils import to_ticker, fill_random_tickers
 from data_fetcher import fetch_index
@@ -15,7 +16,12 @@ from news_scraper import get_news_for_symbol
 from chart_maker import performance_charts
 from email_sender import send_email
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Load OpenAI key from env OR Streamlit secrets
+_api_key = os.getenv("OPENAI_API_KEY", "").strip()
+if not _api_key:
+    _api_key = st.secrets.get("OPENAI_API_KEY", "").strip()
+openai.api_key = _api_key
+
 CHAT_MODEL = "gpt-3.5-turbo"
 
 INDEX_DISPLAY = {
