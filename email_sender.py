@@ -21,7 +21,7 @@ def send_email(recipient: str, subject: str, html_body: str, inline_images=None)
     # --- 1) Build message with alternative parts ---
     msg = MIMEMultipart("related")
     # Friendly From header
-    msg["From"] = f"📈 Finance News <{SMTP_SENDER}>"
+    msg["From"] = f"Finance News <{SMTP_SENDER}>"
     msg["To"]      = recipient
     msg["Subject"] = subject
     msg["Reply-To"] = SMTP_SENDER
