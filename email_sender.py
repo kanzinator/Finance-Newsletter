@@ -1,62 +1,47 @@
 # email_sender.py
 
-import os, smtplib, re
+import os
+import smtplib
+import re
 from email.mime.text     import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image    import MIMEImage
 from dotenv              import load_dotenv
+from bs4                 import BeautifulSoup  # pip install beautifulsoup4
 
-load_dotenv()  # read .env
+load_dotenv()
 
-SMTP_SERVER   = os.getenv("SMTP_SERVER", "smtp.sendgrid.net")
+SMTP_SERVER   = os.getenv("SMTP_SERVER")
 SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_SENDER   = os.getenv("SMTP_SENDER")
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "apikey")
+SMTP_SENDER   = os.getenv("SMTP_SENDER")   # e.g. 64001@novasbe.pt
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
-# simple email‐address validator
-_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
-
-def send_email(
-    recipient: str,
-    subject: str,
-    html_body: str,
-    inline_images: list[MIMEImage] | None = None,
-) -> None:
-    """
-    Send an HTML e-mail. Recipient must be a single valid address.
-    """
-
-    if not all([SMTP_SENDER, SMTP_PASSWORD]):
-        raise RuntimeError("SMTP credentials missing in .env")
-
-    # 1) Clean & validate
-    recip = recipient.strip()
-    if not _EMAIL_RE.match(recip):
-        raise ValueError(f"Invalid recipient address: {repr(recip)}")
-
-    # 2) Build the message
+def send_email(recipient: str, subject: str, html_body: str, inline_images=None):
+    # --- 1) Build message with alternative parts ---
     msg = MIMEMultipart("related")
-    msg["From"]    = SMTP_SENDER
-    msg["To"]      = recip
+    # Friendly From header
+    msg["From"] = f"📈 Finance News <{SMTP_SENDER}>"
+    msg["To"]      = recipient
     msg["Subject"] = subject
+    msg["Reply-To"] = SMTP_SENDER
+    # Unsubscribe header (very spam-filter–friendly)
+    msg["List-Unsubscribe"] = f"<mailto:{SMTP_SENDER}?subject=Unsubscribe>"
 
+    # Plain-text fallback: strip tags
+    plain_text = BeautifulSoup(html_body, "html.parser").get_text()
     alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(plain_text, "plain"))
     alt.attach(MIMEText(html_body, "html"))
     msg.attach(alt)
 
+    # --- 2) Attach inline images if any ---
     if inline_images:
         for img in inline_images:
             msg.attach(img)
 
-    # 3) Send via SMTP.sendmail (avoids header‐parsing issues)
+    # --- 3) Send via SMTP TLS ---
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.sendmail(
-            SMTP_SENDER,
-            [recip],
-            msg.as_string()
-        )
-
-    print(f"📨 Digest sent to {recip}")
+        server.sendmail(SMTP_SENDER, [recipient], msg.as_string())
