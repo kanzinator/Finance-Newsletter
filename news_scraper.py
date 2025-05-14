@@ -1,22 +1,15 @@
 # news_scraper.py
 
 import os
-import time
 import datetime as dt
 import requests
 import re
 
-import streamlit as st  # ← NEW
+import streamlit as st
 
-# Load NewsAPI key from env OR Streamlit secrets
-NEWS_KEY = os.getenv("NEWS_API_KEY", "").strip()
-if not NEWS_KEY:
-    NEWS_KEY = st.secrets.get("NEWS_API_KEY", "").strip()
-
-# Load Finnhub key from env OR Streamlit secrets
-FINNHUB_KEY = os.getenv("FINNHUB_API_KEY", "").strip()
-if not FINNHUB_KEY:
-    FINNHUB_KEY = st.secrets.get("FINNHUB_API_KEY", "").strip()
+# Load API keys from env OR Streamlit secrets
+NEWS_KEY    = os.getenv("NEWS_API_KEY", "").strip() or st.secrets["NEWS_API_KEY"]
+FINNHUB_KEY = os.getenv("FINNHUB_API_KEY", "").strip() or st.secrets["FINNHUB_API_KEY"]
 
 FINNHUB_URL = "https://finnhub.io/api/v1/company-news"
 
@@ -25,7 +18,6 @@ HQ_DOMAINS = [
     "cnbc.com", "reuters.com", "markets.ft.com",
     "marketwatch.com",
 ]
-
 TICKER_RE = re.compile(r"^[A-Z0-9\.\-]{1,6}$")
 
 
@@ -33,11 +25,11 @@ def _fetch_newsapi(symbol: str, company: str, max_items: int, domains: str | Non
     if not NEWS_KEY:
         return []
     params = {
-        "apiKey":    NEWS_KEY,
-        "qInTitle":  f"{symbol} OR \"{company}\"",
-        "pageSize":  max_items,
-        "language":  "en",
-        "sortBy":    "publishedAt",
+        "apiKey":   NEWS_KEY,
+        "qInTitle": f"{symbol} OR \"{company}\"",
+        "pageSize": max_items,
+        "language": "en",
+        "sortBy":   "publishedAt",
     }
     if domains:
         params["domains"] = domains
@@ -64,7 +56,7 @@ def _fetch_finnhub(symbol: str, days: int, max_items: int) -> list[dict]:
         return []
 
     today = dt.date.today()
-    frm = today - dt.timedelta(days=days)
+    frm   = today - dt.timedelta(days=days)
     params = {
         "symbol": symbol,
         "from":   frm.isoformat(),
@@ -79,14 +71,12 @@ def _fetch_finnhub(symbol: str, days: int, max_items: int) -> list[dict]:
         return []
 
     data = r.json() or []
-    out = []
-    for it in data[:max_items]:
-        out.append({
-            "title":  it.get("headline", "No headline"),
-            "url":    it.get("url",      ""),
-            "source": it.get("source",   "Finnhub"),
-        })
-    return out
+    return [
+        {"title": it.get("headline","No headline"),
+         "url":   it.get("url",""),
+         "source":it.get("source","Finnhub")}
+        for it in data[:max_items]
+    ]
 
 
 def get_news_for_symbol(symbol: str, company: str, max_items: int = 5) -> list[dict]:
@@ -95,14 +85,14 @@ def get_news_for_symbol(symbol: str, company: str, max_items: int = 5) -> list[d
     if len(hq) >= max_items:
         return hq[:max_items]
 
-    # 2) Top up with general NewsAPI
+    # 2) General NewsAPI
     needed   = max_items - len(hq)
     loose    = _fetch_newsapi(symbol, company, needed, domains=None)
     combined = hq + loose
     if len(combined) >= max_items:
         return combined[:max_items]
 
-    # 3) Fallback to Finnhub if it looks like a ticker
+    # 3) Fallback to Finnhub if ticker‐like
     if TICKER_RE.fullmatch(symbol):
         fb = _fetch_finnhub(symbol, days=7, max_items=max_items - len(combined))
         combined.extend(fb)

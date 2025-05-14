@@ -1,13 +1,11 @@
 # newsletter.py
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 from datetime import datetime
+
 import openai
 import yfinance as yf
-import streamlit as st   # ← NEW
+import streamlit as st
 
 from utils import to_ticker, fill_random_tickers
 from data_fetcher import fetch_index
@@ -17,9 +15,7 @@ from chart_maker import performance_charts
 from email_sender import send_email
 
 # Load OpenAI key from env OR Streamlit secrets
-_api_key = os.getenv("OPENAI_API_KEY", "").strip()
-if not _api_key:
-    _api_key = st.secrets.get("OPENAI_API_KEY", "").strip()
+_api_key = os.getenv("OPENAI_API_KEY", "").strip() or st.secrets["OPENAI_API_KEY"]
 openai.api_key = _api_key
 
 CHAT_MODEL = "gpt-3.5-turbo"
@@ -33,6 +29,9 @@ INDEX_DISPLAY = {
     "Africa":        "S&P Africa BMI",
     "Australia":     "ASX 200",
 }
+
+# … the rest of your Streamlit UI code remains unchanged …
+
 
 def _color_pct(pct: float) -> str:
     color = "#008000" if pct >= 0 else "#D00000"
